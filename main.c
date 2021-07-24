@@ -7,9 +7,9 @@
 
 #define N 1024
 
-float get_time()
+long double get_time()
 {
-  return(float)clock()/CLOCKS_PER_SEC;
+  return(long double)clock()/CLOCKS_PER_SEC;
 }
 
 
@@ -50,22 +50,66 @@ label(uint32_t *ret, uint32_t *l, uint32_t *r, int index)
 
 int main()
 {
-  float trapdoor_start = get_time(); 
+  int i, j;
+  long double trapdoor_start = get_time(); 
   uint32_t l[N];
   uint32_t r[N];
-  float trapdoor_end = get_time(); 
+  long double trapdoor_end = get_time(); 
   if (!fill_trapdoors(l, r)) return 1;
-  float trapdoor_time = trapdoor_end - trapdoor_start;
-  printf("trapdoor generation: %f\n", trapdoor_time);
-  const int MAX_LEAVES = 65536;
-  uint32_t ret[N];
-  for(int i=0; i<N; i++) {
-    ret[i] = 1;
+  long double trapdoor_time = trapdoor_end - trapdoor_start;
+  printf("trapdoor generation: %Lf\n", trapdoor_time);
+  {
+    uint32_t ret[N];
+    for(i=0; i<N; i++) {
+      ret[i] = 1;
+    }
+    long double label_start = get_time(); 
+    label(ret, l, r, 15);
+    long double label_end = get_time(); 
+    long double label_time = label_end - label_start;
+    printf("computing a label: %Lf\n", label_time);
   }
-  float label_start = get_time(); 
-  label(ret, l, r, 15);
-  float label_end = get_time(); 
-  float label_time = label_end - label_start;
-  printf("computing a label: %f\n", label_time);
+  uint32_t accumulator[N] = {0}; 
+  uint32_t current_label[N];
+  {
+    long double accumulation_start = get_time();
+    for(i=0; i<65536; i++)
+    {
+      label(current_label, l, r, i);
+      for(j=0; j<N; j++)
+      {
+        ADD_MOD(accumulator[j], accumulator[j], current_label[j], 59393);
+      }
+    }
+    long double accumulation_end = get_time(); 
+    long double accumulation_time = accumulation_end - accumulation_start;
+    printf("accumulation of 65536 elements: %Lf\n", accumulation_time);
+  }
+  uint32_t witness[N] = {0};
+  {
+    long double witness_start = get_time();
+    for(i=0; i<N; i++)
+    {
+      SUB_MOD(witness[i], accumulator[i], current_label[i], 59393);
+    }
+    long double witness_end = get_time(); 
+    long double witness_time = witness_end - witness_start;
+    printf("witness generation: %Lf\n", witness_time);
+  }
+  uint32_t verifier_state[N] = {0};
+  {
+    long double verification_start = get_time();
+    for(i=0; i<N; i++)
+    {
+      ADD_MOD(verifier_state[i], witness[i], current_label[i], 59393);
+      if(verifier_state[i] != accumulator[i]) {
+        printf("Verification failed!");
+        return 1;
+      }
+    }
+    long double verification_end = get_time(); 
+    long double verification_time = verification_end - verification_start;
+    printf("verification: %Lf\n", verification_time);
+  }
   return 0;
 }
